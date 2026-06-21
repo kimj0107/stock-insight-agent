@@ -19,8 +19,9 @@ import re
 import subprocess
 import sys
 
-# 팝업에 우선적으로 보여줄 섹션 헤더 키워드.
-POPUP_SECTION_KEYWORDS = ("핵심 요약", "요약", "뉴스와의 연결", "뉴스 연결", "뉴스")
+# 팝업에 우선적으로 보여줄 섹션 마커(이모지). 분석 출력의 섹션 헤더와 맞춘다:
+#   📊 가격 변동 / 📰 뉴스·촉매 / ⚠️ 주의사항·면책
+POPUP_SECTION_KEYWORDS = ("📊", "📰", "⚠️")
 
 from dotenv import load_dotenv
 

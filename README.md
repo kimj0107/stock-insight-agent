@@ -44,8 +44,10 @@ curl -X POST http://localhost:8000/analyze \
 응답 예시:
 
 ```json
-{ "ticker": "AAPL", "analysis": "최근 5거래일 +7.8% ... (근거 포함 설명)" }
+{ "ticker": "AAPL", "analysis": "Apple rose ~3% this week on ...\n\n📊 The price move ...\n📰 News & catalysts ...\n⚠️ ... This is an explanation of price moves, not investment advice." }
 ```
+
+> 분석 출력은 영어로, 마크다운 표·헤더 없이 이모지(📊/📰/⚠️) 섹션 + 자연스러운 산문으로 작성됩니다.
 
 | 엔드포인트 | 설명 |
 |-----------|------|
