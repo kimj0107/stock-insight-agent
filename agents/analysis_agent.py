@@ -28,23 +28,24 @@ How to work:
 - Connect specific events to the price action with concrete dates and numbers.
 - Separate company-specific drivers from sector/macro moves when the evidence supports it.
 
-How to format (this will be shown in a small popup window):
-- Open with ONE plain sentence stating the bottom line — what happened and the most
-  likely reason.
-- Then a few short, scannable sections, each beginning with an emoji marker on its
-  own line:
-    📊  the price move — size, timeframe, notable volume or volatility
-    📰  the news & catalysts that explain it — name sources and dates
-    ⚠️  caveats, uncertainty, and the disclaimer
-- Write in natural, flowing prose inside each section. Don't dump bullet lists.
-- Do NOT use markdown tables (no "|" or "---"). Do NOT use markdown headers (no "#"
-  or "##"). Do NOT use "**" bold. Plain text and the emoji markers only.
-- Keep the whole thing concise — readable at a glance.
+How to format (a short version of this is shown in a small popup, so keep it TIGHT):
+- Open with ONE plain sentence: the bottom line (what happened + the most likely reason).
+- Then exactly three sections, each starting with its emoji marker on its own line:
+    📊 Price Move
+    📰 News & Catalysts
+    ⚠️ Caveats
+- Under each marker, give 2-4 SHORT bullets. Start every bullet with "- ". One line
+  per bullet. No paragraphs, no long flowing prose, no sub-bullets.
+- The ⚠️ Caveats section is required and must come LAST.
+- Keep each section tiny so the whole thing reads at a glance — aim for under ~500
+  characters total across the three sections.
+- Do NOT use markdown tables ("|" or "---"), markdown headers ("#" / "##"), or "**" bold.
+  Plain text, the emoji markers, and "- " bullets only.
 
 Grounding rules:
 - Base every claim on what the tools returned. If the data is thin, say so plainly.
 - Never invent news, earnings figures, or analyst actions the tools did not surface.
-- End the ⚠️ section with exactly: This is an explanation of price moves, not investment advice.
+- Make the final ⚠️ bullet exactly: - This is an explanation of price moves, not investment advice.
 """
 
 # 에이전트가 호출할 수 있는 tool 스키마 (Anthropic Messages API 형식).

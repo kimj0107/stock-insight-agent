@@ -42,31 +42,59 @@ def summary_line(text: str, limit: int = 120) -> str:
     return "분석 완료"
 
 
-def popup_excerpt(text: str, limit: int = 1500) -> str:
-    """팝업에 보여줄 핵심 발췌를 만든다.
+def _split_emoji_sections(text: str) -> list[dict]:
+    """분석 텍스트를 이모지 마커(📊/📰/⚠️) 기준 섹션으로 나눈다.
 
-    "핵심 요약" / "뉴스와의 연결" 같은 섹션이 있으면 그 부분을 우선 추출하고,
-    없으면 전체 분석을 사용한다. 마지막에 limit(기본 1500자) 이내로 자른다.
+    각 섹션: {"header": "📊 Price Move", "bullets": ["- ...", "- ..."]}
+    첫 마커 이전의 리드 문장 등은 무시한다 (팝업에는 섹션만 표시).
+    """
+    sections: list[dict] = []
+    cur: dict | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if any(stripped.startswith(m) for m in POPUP_SECTION_KEYWORDS):
+            cur = {"header": stripped, "bullets": []}
+            sections.append(cur)
+        elif cur is not None and stripped:
+            cur["bullets"].append(stripped)
+    return sections
+
+
+def _render_section(s: dict) -> str:
+    return s["header"] + ("\n" + "\n".join(s["bullets"]) if s["bullets"] else "")
+
+
+def popup_excerpt(text: str, limit: int = 600) -> str:
+    """팝업용 짧은 발췌를 만든다.
+
+    세 섹션(📊/📰/⚠️)을 모두 포함하되 전체를 limit(기본 600자) 이내로 유지한다.
+    너무 길면 ⚠️ Caveats 섹션은 건드리지 않고, 나머지 섹션의 뒤쪽 bullet 부터
+    잘라낸다 — Caveats 가 잘려나가는 일이 없도록 보장한다.
     """
     text = text.strip()
-    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    sections = _split_emoji_sections(text)
+    if not sections:
+        return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
-    chosen: list[str] = []
-    i = 0
-    while i < len(paras):
-        first_line = paras[i].splitlines()[0]
-        if any(kw in first_line for kw in POPUP_SECTION_KEYWORDS):
-            chosen.append(paras[i])
-            # 헤더만 있는 문단이면 바로 다음(본문) 문단도 함께 포함.
-            if len(paras[i]) <= 40 and i + 1 < len(paras):
-                chosen.append(paras[i + 1])
-                i += 1
-        i += 1
+    caveat = next((s for s in sections if s["header"].startswith("⚠️")), None)
+    others = [s for s in sections if s is not caveat]
 
-    excerpt = "\n\n".join(chosen).strip() if chosen else text
-    if len(excerpt) > limit:
-        excerpt = excerpt[: limit - 1].rstrip() + "…"
-    return excerpt or text[:limit]
+    sep = "\n\n"
+    # Caveats 가 들어갈 자리를 먼저 확보하고, 남는 예산으로 나머지 섹션을 채운다.
+    reserve = len(_render_section(caveat)) + len(sep) if caveat else 0
+    budget = max(0, limit - reserve)
+
+    pieces: list[str] = []
+    for s in others:
+        # 예산을 초과하면 이 섹션의 뒤쪽 bullet 부터 제거 (헤더는 유지).
+        while s["bullets"] and len(sep.join(pieces + [_render_section(s)])) > budget:
+            s["bullets"].pop()
+        pieces.append(_render_section(s))
+
+    if caveat is not None:
+        pieces.append(_render_section(caveat))  # 항상 통째로, 마지막에
+
+    return sep.join(pieces)
 
 
 def popup_macos(title: str, message: str) -> None:
