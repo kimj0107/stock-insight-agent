@@ -62,13 +62,17 @@ curl -X POST http://localhost:8000/analyze \
 python cli.py TSLA              # 인자로 티커 전달
 echo "TSLA" | python cli.py    # stdin 으로 전달 (크롬에서 선택 텍스트 파이프 등)
 python cli.py TSLA --notify     # 한 줄 요약을 macOS 알림으로 표시
-python cli.py TSLA --popup      # 핵심 발췌를 macOS 팝업 창으로 표시
+python cli.py TSLA --popup      # 토스 스타일 HTML 카드 팝업(브라우저)로 표시
 python cli.py TSLA --notify --popup   # 둘 다 (독립적으로 동작)
 python cli.py TSLA -q "어제 급락 원인은?"   # 추가 질문
 ```
 
 - 입력에서 티커만 추출합니다 (공백/줄바꿈 제거, 대문자 변환).
-- 결과는 한국어로 stdout에 출력됩니다.
+- 분석 출력은 영어이며, 전체 분석은 stdout 에 그대로 출력됩니다.
+- `--popup` 은 토스 증권 "왜 움직였나" 카드처럼 다크 테마 HTML 카드를
+  임시 파일로 생성해 브라우저 팝업으로 엽니다 (헤드라인 · 티커/등락률 ·
+  "Why did it move?" 불릿 · 테마 태그 칩 · 닫기 버튼). 등락 색상은 한국식
+  (상승=빨강, 하락=파랑).
 - `ANTHROPIC_API_KEY` 가 없으면 안내 메시지를 출력하고 종료합니다.
 
 ## 환경 변수
