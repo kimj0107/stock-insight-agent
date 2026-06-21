@@ -59,7 +59,9 @@ curl -X POST http://localhost:8000/analyze \
 ```bash
 python cli.py TSLA              # 인자로 티커 전달
 echo "TSLA" | python cli.py    # stdin 으로 전달 (크롬에서 선택 텍스트 파이프 등)
-python cli.py TSLA --notify     # 결과를 macOS 알림으로도 표시
+python cli.py TSLA --notify     # 한 줄 요약을 macOS 알림으로 표시
+python cli.py TSLA --popup      # 핵심 발췌를 macOS 팝업 창으로 표시
+python cli.py TSLA --notify --popup   # 둘 다 (독립적으로 동작)
 python cli.py TSLA -q "어제 급락 원인은?"   # 추가 질문
 ```
 

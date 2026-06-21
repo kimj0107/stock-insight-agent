@@ -15,8 +15,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
+
+# 팝업에 우선적으로 보여줄 섹션 헤더 키워드.
+POPUP_SECTION_KEYWORDS = ("핵심 요약", "요약", "뉴스와의 연결", "뉴스 연결", "뉴스")
 
 from dotenv import load_dotenv
 
@@ -35,6 +39,58 @@ def summary_line(text: str, limit: int = 120) -> str:
         if s:
             return s if len(s) <= limit else s[: limit - 1] + "…"
     return "분석 완료"
+
+
+def popup_excerpt(text: str, limit: int = 1500) -> str:
+    """팝업에 보여줄 핵심 발췌를 만든다.
+
+    "핵심 요약" / "뉴스와의 연결" 같은 섹션이 있으면 그 부분을 우선 추출하고,
+    없으면 전체 분석을 사용한다. 마지막에 limit(기본 1500자) 이내로 자른다.
+    """
+    text = text.strip()
+    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+    chosen: list[str] = []
+    i = 0
+    while i < len(paras):
+        first_line = paras[i].splitlines()[0]
+        if any(kw in first_line for kw in POPUP_SECTION_KEYWORDS):
+            chosen.append(paras[i])
+            # 헤더만 있는 문단이면 바로 다음(본문) 문단도 함께 포함.
+            if len(paras[i]) <= 40 and i + 1 < len(paras):
+                chosen.append(paras[i + 1])
+                i += 1
+        i += 1
+
+    excerpt = "\n\n".join(chosen).strip() if chosen else text
+    if len(excerpt) > limit:
+        excerpt = excerpt[: limit - 1].rstrip() + "…"
+    return excerpt or text[:limit]
+
+
+def popup_macos(title: str, message: str) -> None:
+    """macOS display dialog 팝업으로 분석 발췌를 표시한다 (확인 버튼 하나).
+
+    notify_macos 와 동일하게 텍스트/제목/버튼 라벨을 모두 argv 로 넘겨
+    한글·따옴표·줄바꿈이 있어도 osascript 파싱 에러(-2741)가 나지 않게 한다.
+    """
+    if sys.platform != "darwin":
+        return
+    body = popup_excerpt(message)
+    script = (
+        "on run argv\n"
+        "    display dialog (item 1 of argv) with title (item 2 of argv) "
+        "buttons {(item 3 of argv)} default button (item 3 of argv)\n"
+        "end run"
+    )
+    try:
+        subprocess.run(
+            ["osascript", "-e", script, body, title, "확인"],
+            check=False,
+            timeout=300,
+        )
+    except Exception:  # noqa: BLE001 - 팝업 실패가 본 분석을 막지 않도록
+        pass
 
 
 def notify_macos(title: str, message: str) -> None:
@@ -77,7 +133,12 @@ def main() -> int:
     parser.add_argument(
         "--notify",
         action="store_true",
-        help="macOS 알림(display notification)으로도 결과를 표시합니다.",
+        help="macOS 알림(display notification)으로 한 줄 요약을 표시합니다.",
+    )
+    parser.add_argument(
+        "--popup",
+        action="store_true",
+        help="macOS 팝업 창(display dialog)으로 핵심 발췌를 표시합니다.",
     )
     args = parser.parse_args()
 
@@ -110,8 +171,11 @@ def main() -> int:
     print(f"\n=== {ticker} 변동 원인 분석 ===\n")
     print(analysis)
 
+    # --notify 와 --popup 은 독립적으로, 둘 다 켤 수 있다.
     if args.notify:
         notify_macos(f"{ticker} 분석 완료", analysis)
+    if args.popup:
+        popup_macos(f"{ticker} 분석", analysis)
 
     return 0
 
