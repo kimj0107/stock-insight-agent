@@ -52,6 +52,21 @@ curl -X POST http://localhost:8000/analyze \
 | `POST /analyze` | `{"ticker": "...", "question": "(선택)"}` → 변동 원인 분석 |
 | `GET /health` | 상태 및 사용 모델 확인 |
 
+## CLI 사용법
+
+서버 없이 터미널/단축키로 빠르게 분석할 때 (`cli.py`):
+
+```bash
+python cli.py TSLA              # 인자로 티커 전달
+echo "TSLA" | python cli.py    # stdin 으로 전달 (크롬에서 선택 텍스트 파이프 등)
+python cli.py TSLA --notify     # 결과를 macOS 알림으로도 표시
+python cli.py TSLA -q "어제 급락 원인은?"   # 추가 질문
+```
+
+- 입력에서 티커만 추출합니다 (공백/줄바꿈 제거, 대문자 변환).
+- 결과는 한국어로 stdout에 출력됩니다.
+- `ANTHROPIC_API_KEY` 가 없으면 안내 메시지를 출력하고 종료합니다.
+
 ## 환경 변수
 
 `.env.example` 참고. 핵심:
