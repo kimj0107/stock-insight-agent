@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
@@ -29,17 +28,34 @@ def read_ticker(arg: str | None) -> str:
     return token.upper()
 
 
+def summary_line(text: str, limit: int = 120) -> str:
+    """분석 결과에서 알림에 쓸 핵심 한 줄 요약을 뽑는다 (첫 비어있지 않은 줄)."""
+    for line in text.splitlines():
+        s = line.strip()
+        if s:
+            return s if len(s) <= limit else s[: limit - 1] + "…"
+    return "분석 완료"
+
+
 def notify_macos(title: str, message: str) -> None:
-    """macOS 알림 센터에 알림을 띄운다. macOS 가 아니면 조용히 무시."""
+    """macOS 알림 센터에 한 줄 요약 알림을 띄운다. macOS 가 아니면 조용히 무시.
+
+    문자열을 AppleScript 소스에 직접 끼워넣지 않고 argv 로 전달한다.
+    이렇게 하면 따옴표·한글·특수문자 이스케이프 문제가 원천적으로 사라진다.
+    (직접 끼워넣으면 한글이 \\uXXXX 로 바뀌어 osascript 가 파싱에 실패함.)
+    """
     if sys.platform != "darwin":
         return
-    # 알림 본문은 길면 잘리므로 앞부분만, AppleScript 문자열은 json.dumps 로 안전하게 이스케이프.
-    body = message.strip().replace("\n", " ")
-    if len(body) > 240:
-        body = body[:237] + "..."
-    script = f"display notification {json.dumps(body)} with title {json.dumps(title)}"
+    body = summary_line(message)
+    script = (
+        "on run argv\n"
+        "    display notification (item 1 of argv) with title (item 2 of argv)\n"
+        "end run"
+    )
     try:
-        subprocess.run(["osascript", "-e", script], check=False, timeout=10)
+        subprocess.run(
+            ["osascript", "-e", script, body, title], check=False, timeout=10
+        )
     except Exception:  # noqa: BLE001 - 알림 실패가 본 분석을 막지 않도록
         pass
 
