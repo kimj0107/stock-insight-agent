@@ -27,6 +27,12 @@ from dotenv import load_dotenv
 DIRECTION_COLOR = {"up": "#ff5b5b", "down": "#4d8dff", "flat": "#9aa0a6"}
 BULLET_ICON = {"price": "📊", "news": "📰"}
 
+# frameless 팝업 창 크기/여백. 카드(약 400px + body 패딩)에 맞춘다.
+POPUP_WIN_W = 440
+POPUP_WIN_H = 680
+POPUP_MARGIN = 40
+POPUP_BG = "#0b0b0c"  # body 배경과 동일 (흰 테두리 방지)
+
 
 def read_ticker(arg: str | None) -> str:
     """인자 또는 stdin 에서 티커를 추출한다 (공백/줄바꿈 제거, 대문자)."""
@@ -114,7 +120,7 @@ POPUP_HTML_TEMPLATE = """<!doctype html>
 </head>
 <body>
   <div class="card">
-    <button class="close" onclick="window.close()" aria-label="Close">&times;</button>
+    <button class="close" onclick="closeCard()" aria-label="Close">&times;</button>
     <div class="headline">__HEADLINE__</div>
     <div class="price"><span class="ticker">__TICKER__</span><span class="pct">__PCT__</span></div>
     <div class="meta">__META__</div>
@@ -123,7 +129,19 @@ POPUP_HTML_TEMPLATE = """<!doctype html>
     <div class="chips">__CHIPS__</div>
     <p class="foot">Not investment advice.</p>
   </div>
-  <script>try { window.resizeTo(440, 660); } catch (e) {}</script>
+  <script>
+    // X 버튼: pywebview 창이면 Python 닫기 훅을, 아니면(브라우저 폴백) window.close().
+    function closeCard() {
+      try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.close) {
+          window.pywebview.api.close();
+          return;
+        }
+      } catch (e) {}
+      window.close();
+    }
+    try { window.resizeTo(440, 660); } catch (e) {}
+  </script>
 </body>
 </html>"""
 
@@ -201,7 +219,7 @@ def write_popup_html(data: dict) -> str:
 
 
 def open_popup(path: str) -> None:
-    """생성된 HTML 파일을 브라우저 팝업으로 연다."""
+    """생성된 HTML 파일을 브라우저로 연다 (pywebview 폴백 경로)."""
     try:
         if sys.platform == "darwin":
             subprocess.run(["open", path], check=False, timeout=10)
@@ -211,6 +229,74 @@ def open_popup(path: str) -> None:
             webbrowser.open("file://" + os.path.abspath(path))
     except Exception:  # noqa: BLE001 - 팝업 열기 실패가 본 분석을 막지 않도록
         pass
+
+
+def _screen_width(default: int = 1440) -> int:
+    """주 화면 너비(px). 실패하면 default."""
+    if sys.platform != "darwin":
+        return default
+    try:
+        out = subprocess.run(
+            ["osascript", "-e",
+             'tell application "Finder" to get bounds of window of desktop'],
+            capture_output=True, text=True, timeout=5,
+        )
+        parts = [p.strip() for p in out.stdout.strip().split(",")]
+        if len(parts) == 4 and parts[2].isdigit():
+            return int(parts[2])
+    except Exception:  # noqa: BLE001
+        pass
+    return default
+
+
+class _PopupApi:
+    """JS -> Python 닫기 훅. HTML 의 X 버튼이 window.pywebview.api.close() 를 호출."""
+
+    def __init__(self) -> None:
+        self.window = None
+
+    def close(self) -> None:
+        if self.window is not None:
+            self.window.destroy()
+
+
+def show_popup_window(html_str: str, title: str) -> bool:
+    """frameless pywebview 창으로 카드를 화면 우상단에 띄운다.
+
+    성공하면 True. pywebview 미설치/임포트 실패나 창 생성 실패 시 False 를
+    돌려 호출부가 브라우저 폴백을 쓰도록 한다.
+
+    주의: macOS 에서 webview.start() 는 반드시 메인 스레드에서 호출해야 하므로
+    이 함수는 분석/HTTP 가 모두 끝난 뒤 main() 마지막에 호출되어야 한다.
+    (start() 는 창이 닫힐 때까지 블로킹된다.)
+    """
+    try:
+        import webview
+    except Exception:  # noqa: BLE001 - 미설치/임포트 실패 -> 폴백
+        return False
+
+    try:
+        x = max(0, _screen_width() - POPUP_WIN_W - POPUP_MARGIN)  # 우측에 붙임
+        y = 60
+        api = _PopupApi()
+        window = webview.create_window(
+            title,
+            html=html_str,
+            js_api=api,
+            frameless=True,
+            easy_drag=True,
+            width=POPUP_WIN_W,
+            height=POPUP_WIN_H,
+            x=x,
+            y=y,
+            on_top=True,
+            background_color=POPUP_BG,
+        )
+        api.window = window
+        webview.start()  # 창이 닫힐 때까지 블로킹 (메인 스레드)
+        return True
+    except Exception:  # noqa: BLE001 - 창 생성/표시 실패 -> 폴백
+        return False
 
 
 def main() -> int:
@@ -235,7 +321,7 @@ def main() -> int:
     parser.add_argument(
         "--popup",
         action="store_true",
-        help="토스 스타일 HTML 카드 팝업을 브라우저로 띄웁니다.",
+        help="토스 스타일 카드를 frameless 플로팅 창으로 띄웁니다 (pywebview).",
     )
     args = parser.parse_args()
 
@@ -274,9 +360,12 @@ def main() -> int:
         body = data.get("headline") or summary_line(data.get("full_analysis", ""))
         notify_macos(f"{ticker} 분석 완료", body)
     if args.popup:
-        path = write_popup_html(data)
-        print(f"🪟 팝업 카드 생성: {path}", file=sys.stderr)
-        open_popup(path)
+        # frameless pywebview 창을 우선 시도하고, 실패하면 브라우저로 폴백.
+        # (webview.start() 는 메인 스레드에서 블로킹되므로 가장 마지막에 호출)
+        if not show_popup_window(render_popup_html(data), f"{ticker} — why it moved"):
+            path = write_popup_html(data)
+            print(f"🪟 팝업(브라우저 폴백): {path}", file=sys.stderr)
+            open_popup(path)
 
     return 0
 

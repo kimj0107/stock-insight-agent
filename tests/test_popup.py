@@ -46,7 +46,10 @@ def test_render_contains_all_sections():
         assert tag in out
     # 푸터 + 닫기 버튼
     assert "Not investment advice." in out
-    assert "window.close()" in out
+    # X 버튼은 closeCard() 를 호출하고, pywebview 닫기 훅 + window.close() 폴백을 가진다.
+    assert 'onclick="closeCard()"' in out
+    assert "window.pywebview.api.close()" in out
+    assert "window.close()" in out  # 브라우저 폴백 경로
     # 카드는 마크다운 표/헤더가 아니라 HTML
     assert "<table" not in out and "|---" not in out
 
